@@ -1,37 +1,11 @@
-## Saving a record
+Storing data on Skygear is built around the `Record`. 
+With Skygear iOS SDK imported, you can interact with the `SKYRecord` class to store and manage your data.
 
-Let's imagine we are writing a To-Do app with Skygear. When user creates
-an to-do item, we want to save that item on server. We probably will save that
-to-do item like this:
+The `Record` data is schemaless, it means you don't need to specify ahead of time what keys exist.
 
-```obj-c
-SKYRecord *todo = [SKYRecord recordWithRecordType:@"todo"];
-todo[@"title"] = @"Write documents for Skygear";
-todo[@"order"] = @1;
-todo[@"done"] = @NO;
 
-SKYDatabase *privateDB = [[SKYContainer defaultContainer] privateCloudDatabase];
-[privateDB saveRecord:todo completion:^(SKYRecord *record, NSError *error) {
-    if (error) {
-        NSLog(@"error saving todo: %@", error);
-        return;
-    }
-
-    NSLog(@"saved todo with recordID = %@", record.recordID);
-}];
-```
-
-There are couples of things we have done here:
-
-1. First we created a `todo` _record_ and assigned some attributes to it.
-2. We fetched the _container_ of our app, and took a reference to the private
-   database of the current user.
-3. We actually saved the `todo` record and registered a block to be executed
-   after the action is done.
-
-We have mentioned _record_, _container_ and _database_. Let's look at them
-one by one.
-
+<a name="ios-record-class"></a>
+# The `SKYRecord` class
 ### SKYRecord
 
 `SKYRecord` is a key-value data object which can be stored in a _database_. Each
@@ -39,13 +13,18 @@ record has a _type_, which describes what kind of data this record holds.
 
 A record can store whatever values that's JSON-serializable, it include
 strings, numbers, booleans, dates, plus several custom type that Skygear
-supports (TODO: add references to other pages).
+supports.
 
+<a name="ios-container"></a>
+# Container
 ### SKYContainer
 
 `SKYContainer` is the uppermost layer of `SKYKit`. It represents the root of all
-resources accessible by an application and one application should have exactly
-one container. In `SKYKit`, such container is accessed via the singleton
+resources accessible by an application.
+
+There should be **only one** container in each application. 
+
+In `SKYKit`, the container can be accessed via the singleton
 `defaultContainer`:
 
 ```obj-c
@@ -56,19 +35,36 @@ Container provides [User Authentication]({{< relref "user.md" >}}),
 [Asset Storage]({{< relref "asset.md" >}}) and access to
 [public and private databases]({{< relref "#SKYDatabase" >}}).
 
+<a name="ios-database"></a>
+# Database
 ### SKYDatabase
 
 `SKYDatabase` is the central hub of data storage in `SKYKit`. The main
 responsibility of database is to store [records]({{< relref "#SKYRecord" >}}),
 the data storage unit in Skygear.
 
+In Skygear, there are two types of databases: private and public database.
+
 Every container has one _pubic database_, which stores data accessible to
 every users. Every user also has its own _private database_, which stores data
 only accessible to that user alone.
 
-## Modifying a record
+<a name="ios-define-record-type"></a>
+# Define the record type
+You can define different record types to model your app. It's just like defining table
+schema in SQL.
 
-Now let's return to our to-do item example:
+``` obj-c
+SKYRecord *note = [SKYRecord recordWithRecordType:@"note"]; // define the note type
+SKYRecord *blog = [SKYRecord recordWithRecordType:@"blog"]; // define the blog type
+```
+
+<a name="ios-save-records"></a>
+# Save record
+
+Let's imagine we are using Skygear to write a To-do app. 
+
+When the user creates a to-do item, we will save it to the server. Sample code as the following:
 
 ```obj-c
 SKYRecord *todo = [SKYRecord recordWithRecordType:@"todo"];
@@ -87,19 +83,51 @@ SKYDatabase *privateDB = [[SKYContainer defaultContainer] privateCloudDatabase];
 }];
 ```
 
-If you run the code above, you console should show:
+In the above example, we have performed the following actions:
+
+1. First we created a `todo` _record_ and assigned some attributes to it.
+2. We fetched the [_container_]("#ios-container") of our app, and set the variable `privateDB` as a reference to the private
+   database of the current user.
+3. We saved the `todo` record and registered a block to be executed
+   after the saving action is done.
+4. By saving a record, it is assigned with a unique `recordID`
+
+<a name="ios-modify-record"></a>
+# Modify the record
+
+Just simply call the `saveRecord:completion:` to modify an existing record
+
+```obj-c
+SKYRecord *todo = [SKYRecord recordWithRecordType:@"todo"];
+todo[@"title"] = @"Write documents for Skygear";
+todo[@"order"] = @1;
+todo[@"done"] = @NO;
+
+SKYDatabase *privateDB = [[SKYContainer defaultContainer] privateCloudDatabase];
+[privateDB saveRecord:todo completion:^(SKYRecord *record, NSError *error) {
+    if (error) {
+        NSLog(@"error saving todo: %@", error);
+        return;
+    }
+
+    NSLog(@"saved todo with recordID = %@", record.recordID);
+}];
+```
+
+By running the code above, you should show see this in your console:
 
 ```
 2015-09-22 16:16:37.893 todoapp[89631:1349388] saved todo with recordID = <SKYRecordID: 0x7ff93ac37940; recordType = todo, recordName = 369067DC-BDBC-49D5-A6A2-D83061D83BFC>
 ```
 
-The `recordID` property on your saved todo is an id which uniquely identifies
-the record in a database. With it you can modify the record later on. Say if
-you have to mark this todo as done:
+The `recordID` property of the item is an unique identifier of the record in the database. 
+
+You can modify the record later with the `recordID`. For example, if you want to mark an item as done:
 
 ```obj-c
 SKYRecord *todo = [SKYRecord recordWithRecordType:@"todo" name:@"369067DC-BDBC-49D5-A6A2-D83061D83BFC"];
 todo[@"done"] = @YES;
+
 [privateDB saveRecord:todo completion:nil];
 ```
 
@@ -108,9 +136,9 @@ different from the originally saved record. This is because additional
 fields maybe applied on the server side when the record is saved. You may
 want to inspect the returned record for any changes applied on the server side.
 
-## Fetching an existing record
-
-With the record ID we could also fetch the record from a database:
+<a name="ios-fetch-record"></a>
+# Fetch existing record
+With the an unique `recordID`, we could also fetch the record from database:
 
 ```obj-c
 SKYRecordID *recordID = [SKYRecordID recordIDWithRecordType:@"todo" name:@"369067DC-BDBC-49D5-A6A2-D83061D83BFC"];
@@ -128,31 +156,34 @@ SKYRecordID *recordID = [SKYRecordID recordIDWithRecordType:@"todo" name:@"36906
 }];
 ```
 
-## Deleting a record
-
-Deleting a record requires its id too:
+<a name="ios-fetch-record"></a>
+# Delete record
+It requires the `recordID` to delete a record:
 
 ```obj-c
 SKYRecordID *recordID = [SKYRecordID recordIDWithRecordType:@"todo" name:@"369067DC-BDBC-49D5-A6A2-D83061D83BFC"];
 [privateDB deleteRecordWithID:recordID completionHandler:nil];
 ```
 
-If you are to delete records in batch, you could also use the
+If you wish to delete records in a batch, you can use the
 `SKYDatabase-deleteRecordsWithIDs:completionHandler:perRecordErrorHandler:`
 method.
 
-## Queries
+<a name="ios-record-queries"></a>
+# Queries
 
-We have shown how to fetch individual records by ids, but in real-world
-application there are usually needs to show a list of items according to
-some criteria. It is supported by queries in Skygear.
+You can fetch a record with its `recordID`.
 
-Let's see how to fetch a list of to-do items to be displayed in our
-hypothetical To-Do app:
+However, in real-world applications, we usually want to list out the items according to
+certain criteria. You can query the records with `SKYQuery` in Skygear.
+
+
+The following example shows how to query and fetch a list of to-do items in an ascending order:
 
 ```obj-c
 SKYQuery *query = [SKYQuery queryWithRecordType:@"todo" predicate:nil];
 
+// Sort with the order key in ascending order
 NSSortDescriptor *sortDescriptor = [NSSortDescriptor sortDescriptorWithKey:@"order" ascending:YES];
 query.sortDescriptors = @[sortDescriptor];
 
@@ -168,12 +199,11 @@ query.sortDescriptors = @[sortDescriptor];
     }
 }];
 ```
+- Construct a `SKYQuery` to search for `todo` records. If there is no additional
+criterion, you may set the predicate to `nil`. 
 
-We constructed a `SKYQuery` to search for `todo` records. There are no additional
-criteria needed so we put the predicate to `nil`. Then we assigned a
-`NSSortDescription` to ask Skygear Server to sort the `todo` records by `order` field
-ascendingly.
+- Then assign an `NSSortDescription` to ask the Skygear Server to sort the `todo` records by `order` field ascendingly.
 
-`SKYQuery` utilizes `NSPredicate` to apply filtering on query results. For
-an overview of features support, please refer to the
+`SKYQuery` utilizes `NSPredicate` to apply filter on the query results. For
+an overview of supported operations, please refer to the
 [Query Guide]({{< relref "query.md" >}}).
